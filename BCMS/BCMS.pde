@@ -18,14 +18,14 @@ void setup(){
   
   motorOutput = new Meter(this, int(pixelWidth*0.66), int(pixelHeight*0.64), true);
   
-  PImage[] imgs = {loadImage("go2.png"),loadImage("stop2.png")};
+  PImage[] imgs = {loadImage("Assets/go.png"),loadImage("Assets/stop.png")};
   cp5.addToggle("controlToggle")
   .setValue(false)
   .setPosition(500, 600)
   .setImages(imgs)
   .setSize(200,100);
   
-  image(loadImage("stopped.png"), 0, 520);
+  image(loadImage("Assets/stopped.png"), 0, 520);
 
   if (Serial.list().length > 0){
     
@@ -38,7 +38,7 @@ void setup(){
     port.bufferUntil( 10 );
   }
   else
-    print("No Xbee detected");
+    print("Warning: No Xbee detected");
   
   
   

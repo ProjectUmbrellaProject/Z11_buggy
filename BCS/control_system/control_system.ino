@@ -7,14 +7,15 @@ String inputString = "";
 boolean stringComplete;
 
 unsigned long previousPingTime;
-const long pingInterval = 300;
-int minimumDistance = 15;
+const long pingInterval = 200; //Determines how frequently the distance is measured from the ultrasonic sensor
+int minimumDistance = 15; //Determines how close an object must be to stop the buggy
 long obstacle_distance;
-bool forward;
+bool forward, objectDetected;
 
 
 void setup() {
   stringComplete = false;
+  objectDetected = false;
   Serial.begin(9600); // initiate serial commubnication at 9600 baud rate
   Serial.print("+++"); //Enter xbee AT commenad mode, NB no carriage return here
   delay(1500);  // Guard time
@@ -39,7 +40,8 @@ void setup() {
 }
 
 void loop() {
-  unsigned long currentTime = millis();
+  
+  unsigned long currentTime = millis(); //Update the time variable with the current time
   if (currentTime - previousPingTime >= pingInterval && forward){
     previousPingTime = currentTime;
     
@@ -47,14 +49,19 @@ void loop() {
    // Serial.println("obstacle");
     Serial.println(String(obstacle_distance));
 
-    if (obstacle_distance <= 15){
-     // moveCommand(0);
-        //Serial.println("obstacle");
+    if (!objectDetected && obstacle_distance <= minimumDistance){
+      
+      objectDetected = true;
+      moveCommand(0);
+      Serial.println("obstacle");
 
     }
-
-    //To remove
-    //print(obstacleDistance());
+    else if (objectDetected && obstacle_distance > minimumDistance){
+        objectDetected = false;
+        moveCommand(1);
+    }
+      
+    }
 
   }
   

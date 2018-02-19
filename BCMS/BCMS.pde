@@ -35,7 +35,7 @@ void setup(){
 
   if (Serial.list().length > 0){
     
-    String portName = Serial.list()[1];
+    String portName = Serial.list()[0];
     port = new Serial(this, portName, 9600);
     port.write("+++");
     delay(1100);

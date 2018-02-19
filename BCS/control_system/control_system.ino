@@ -69,6 +69,7 @@ void loop() {
     moveCommand("0");
     delay(gantryWaitTime); //Delay because nothing useful has to happen under the gantry
     moveCommand("1");
+    delay(500); //Allow the buggy to move away from the gantry before checking the IR receiver again
     
     gantryDetected = false;
   }

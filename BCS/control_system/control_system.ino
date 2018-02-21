@@ -5,12 +5,17 @@ const int leftMotorPin = 4, rightMotorPin = 7, speedPin = 3, trigPin = 9, echoPi
 String inputString = "";
 
 unsigned long previousPingTime;
-unsigned long gantryDetectionTime;
 const int pingInterval = 400; //Determines how frequently the distance is measured from the ultrasonic sensor
 const short minimumDistance = 15; //Determines how close an object must be to stop the buggy
 const int gantryWaitTime = 1500; //Determines how long the buggy waits after detecting a gantry
 const int motorPower = 170;
-bool forward, objectDetected, stringComplete, gantryDetected;
+bool forward, objectDetected, stringComplete;
+
+bool gantryDetected; //true if gantry is detected
+unsigned long gantryDuration; //duration of the gantry pulse
+int pulsecounter; //how many pulses have been recorded
+int maxPulse; //maximum pulse length recorded
+
 
 void setup() {
   //Declare output and input pins
@@ -32,6 +37,9 @@ void setup() {
   objectDetected = false;
   forward = false;
   gantryDetected = false;
+
+  pulsecounter =0;
+  maxPulse = 0; 
   
   Serial.begin(9600); // initiate serial commubnication at 9600 baud rate
   Serial.print("+++"); //Enter xbee AT commenad mode, NB no carriage return here
@@ -64,15 +72,7 @@ void loop() {
     stringComplete = false;
   }
 
-  if (gantryDetected){
-    Serial.println("~7");
-    moveCommand("0");
-    delay(gantryWaitTime); //Delay because nothing useful has to happen under the gantry
-    moveCommand("1");
-    delay(500); //Allow the buggy to move away from the gantry before checking the IR receiver again
-    
-    gantryDetected = false;
-  }
+  readPulse();
 }
 
 void moveCommand(int command){
@@ -171,4 +171,51 @@ void serialEvent() {
     }
   }
 }
+
+void readPulse(){
+  
+  if(gantryDetected && pulsecounter < 10){
+    Serial.println("~7");
+    moveCommand("0");
+    
+    //geting the duration of the pulse
+    gantryDuration = pulseInLong(gantryIRPIN, LOW);
+    
+      if(gantryDuration > maxPulse){
+        maxPulse = gantryDuration;
+      }    
+    gantryDetected = false;
+    delay(100); //adjust to get faster timing if needed
+    pulsecounter++;
+    
+  }else if(pulsecounter ==10){    
+    int gantryNum = determineGantry();
+    
+    if(gantryNum == -1){
+      Serial.println("undetermined gantry");
+    }else{
+     Serial.print("gantry number is ");
+     Serial.println(gantryNum);
+    }
+    
+    moveCommand("1");
+    delay(500); //Allow the buggy to move away from the gantry before checking the IR receiver again
+    pulsecounter = 0;
+    maxPulse = 0; 
+    gantryDetected = false;
+    
+  }
+}
+
+int determineGantry(){  
+  if(maxPulse < 1250 && maxPulse > 750){
+    return 1;
+  }else if(maxPulse < 2250 && maxPulse > 1750){
+    return 2;
+  }else if(maxPulse < 3250 && maxPulse > 2750){
+    return 3;
+  }else return -1;
+  
+}
+
 

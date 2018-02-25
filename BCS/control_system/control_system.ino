@@ -1,6 +1,6 @@
 #include <SPI.h> 
 
-const int leftMotorPin = 4, rightMotorPin = 7, speedPin = 3, trigPin = 9, echoPin = 8, gantryIRPIN = 2;
+const int leftMotorPin = 4, rightMotorPin = 7, speedPin = 3, trigPin = 9, echoPin = 8, gantryIRPIN = 2, leftOvr = 5, rightOvr = 6;
 
 String inputString = "";
 
@@ -24,6 +24,8 @@ void setup() {
   pinMode(speedPin, OUTPUT);
   pinMode(leftMotorPin, OUTPUT);
   pinMode(rightMotorPin, OUTPUT);
+  pinMode(leftOvr, OUTPUT);
+  pinMode(rightOvr, OUTPUT);
   pinMode(gantryIRPIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(gantryIRPIN), gantryInterrupt, CHANGE);
 
@@ -32,7 +34,10 @@ void setup() {
   analogWrite(speedPin, motorPower);
   digitalWrite(leftMotorPin, HIGH);
   digitalWrite(rightMotorPin, HIGH);
-  
+
+  digitalWrite(leftOvr, LOW);
+  digitalWrite(rightOvr, LOW);
+    
   stringComplete = false;
   objectDetected = false;
   forward = false;

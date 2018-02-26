@@ -43,7 +43,7 @@ void setup() {
   forward = false;
   gantryDetected = false;
 
-  pulsecounter =0;
+  pulsecounter = 0;
   maxPulse = 0; 
   
   Serial.begin(9600); // initiate serial commubnication at 9600 baud rate
@@ -86,19 +86,17 @@ void moveCommand(int command){
       //Stop
       case 0:
         delay(20);
-        digitalWrite(leftMotorPin, HIGH);
-        digitalWrite(rightMotorPin, HIGH);
-        forward = false;
+        analogWrite(speedPin, 0);
         Serial.println("~4");
         Serial.print("~8");
         Serial.println(0);
+        forward = false;
         break;
   
       //Move Forward
       case 1:
         delay(20);
-        digitalWrite(leftMotorPin, LOW);
-        digitalWrite(rightMotorPin, LOW);
+        analogWrite(speedPin, motorPower);
         Serial.println("~9");
         Serial.print("~8");
         Serial.println(motorPower);

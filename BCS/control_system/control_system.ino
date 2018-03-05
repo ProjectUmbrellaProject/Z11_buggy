@@ -2,14 +2,14 @@
 #include <SPI.h> 
 
 //#define is a pre-compiler directive that results in 0 RAM use
-#define leftMotorPin 4
-#define rightMotorPin 7
-#define speedPin 3
-#define trigPin 8
-#define echoPin 8
 #define gantryIRPIN 2
+#define speedPin 3
+#define leftMotorPin 4
 #define leftOverride 5
 #define rightOverride 6
+#define rightMotorPin 7
+#define trigPin 8
+#define echoPin 9
 
 String inputString = "";
 

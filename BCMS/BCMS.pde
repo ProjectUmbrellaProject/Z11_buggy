@@ -5,7 +5,7 @@ import processing.serial.*;
 Serial port;
 Meter motorOutput;
 int counter = 0, currentMotorValue, previousTime, currentDetection;
-boolean controlToggle, stopped, moving, obstacleDetected;
+boolean controlToggle, moving, obstacleDetected;
 ControlP5 cp5;
 
 void setup(){
@@ -14,7 +14,6 @@ void setup(){
   background(255);
   cp5 = new ControlP5(this);
   controlToggle = false;
-  stopped = true;
   moving = false;
   obstacleDetected = false;
   currentMotorValue = 0;
@@ -65,12 +64,12 @@ void draw(){
     previousTime = millis();
 
   
-  if (stopped)
-      image(loadImage("Assets/stopped.png"), 0, 520);
+  if (obstacleDetected)
+      image(loadImage("Assets/obstacleDetected.png"), 0, 520);
   else if (moving)
       image(loadImage("Assets/forward.png"), 0, 520);
-  else if (obstacleDetected)
-      image(loadImage("Assets/obstacleDetected.png"), 0, 520);
+  else if (!moving)
+      image(loadImage("Assets/stopped.png"), 0, 520);
   
     motorOutput.updateMeter(currentMotorValue);
 }
@@ -98,39 +97,76 @@ void commandInterpreter(String command){
     
     case '~':
     
-      switch (command.charAt(1)){
-        case '5':
+      switch (command.substring(1,3).trim()){
+        //6: Obstacle detected
+        case "6":
           obstacleDetected = true;
-          stopped = false;
           moving = false;
+          println("obstacle detected");
         break;
         
-        case '6':
-          print("Unrecognised command recieved by buggy");
+        //7: Gantry XX detected
+        case "7":
+          currentDetection = Integer.valueOf((command.substring(3)).trim());     
+          
         break;
         
-        case '7':
-          currentDetection = Integer.valueOf((command.substring(2)).trim());         
-        break;
-        
-        case '8':
-          currentMotorValue = Integer.valueOf((command.substring(2)).trim());
+        //8: Motor power set to XX
+        case "8":
+          currentMotorValue = Integer.valueOf((command.substring(3)).trim());
           
         break;
             
-        case '9':
+        //9: Move command confirmation
+        case "9":
           obstacleDetected = false;
-          stopped = false;
           moving = true;
           
         break;
         
-        case '4':
+        //10: Stop command confirmation
+        case "10":
           obstacleDetected = false;
-          stopped = true;
-          moving = false;
+          moving = false; 
           
          break;
+         
+        //11: Detected colour ID XX
+        case "11":
+        
+          //There are duplicates of the slow down and speed up signs. In order to determine which of the two signs the buggy encoutered the previous detection must be considered.
+          switch (Integer.valueOf((command.substring(3)).trim())){
+            //Red: Slow down sign
+            case 1:
+              if (currentDetection == 3)
+                currentDetection = 5;
+              else if (currentDetection == 6)
+                currentDetection = 7;
+            break;
+            
+            //Green: Speed up sign
+            case 2:
+              if (currentDetection == 5)
+                currentDetection = 6;
+              else if (currentDetection == 2)
+                currentDetection = 6;
+              else if (currentDetection == 7)
+                currentDetection = 8;
+            break;
+            
+            //Yellow: Take fork
+            case 3:
+              currentDetection = 4;
+              
+            break;     
+          }
+          
+        break;
+        
+        //20: Unknown command
+        case "20":
+          print("Unrecognised command recieved by buggy");
+        break;
            
   }
   break;
@@ -139,7 +175,7 @@ void commandInterpreter(String command){
 
 public void controlEvent(ControlEvent theEvent){
   //Getting sick of that annoying error on launch...
-  if (millis() > 1000){
+  if (millis() > 2000){
     switch (theEvent.getController().getName()){
       case "controlToggle":
  

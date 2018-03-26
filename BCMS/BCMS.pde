@@ -5,7 +5,7 @@ import processing.serial.*;
 Serial port;
 Meter motorOutput;
 int counter = 0, currentMotorValue, previousTime, currentDetection;
-boolean controlToggle, moving, obstacleDetected;
+boolean controlToggle, moving, obstacleDetected, pressedToggle;
 ControlP5 cp5;
 
 void setup(){
@@ -16,6 +16,7 @@ void setup(){
   controlToggle = false;
   moving = false;
   obstacleDetected = false;
+  pressedToggle = false;
   currentMotorValue = 0;
   currentDetection = 0;
   
@@ -72,37 +73,42 @@ void draw(){
       image(loadImage("Assets/stopped.png"), 0, 520);
   
     motorOutput.updateMeter(currentMotorValue);
+
 }
 
 void serialEvent(Serial p){
    String receivedString = p.readString();
-   print(receivedString);
-   counter++; //During the initial startup the serial event callback will be called 9 times. The counter allows these calls to be ignored
    
-   if (counter > 9){
-     commandInterpreter(receivedString);
-    
-     if ((receivedString.trim()).equals("obstacle"))
-       cp5.getController("controlToggle").setValue(0);
-     
+   //If the string starts with ~ it contains useful information
+   if (receivedString.charAt(0) == '~'){
+       printCommandInformation(receivedString);
+       commandInterpreter(receivedString);          
    }
-   
+   else
+     print(receivedString);
+
+
+   counter++; //During the initial startup the serial event callback will be called 9 times. The counter allows these calls to be ignored
+  /* 
+   if (counter > 9)    
+         commandInterpreter(receivedString);
+         */  
    p.clear();
    
  
 }
 
+
 void commandInterpreter(String command){
   switch (command.charAt(0)){
     
     case '~':
-    
       switch (command.substring(1,3).trim()){
         //6: Obstacle detected
         case "6":
           obstacleDetected = true;
           moving = false;
-          println("obstacle detected");
+          
         break;
         
         //7: Gantry XX detected
@@ -133,34 +139,25 @@ void commandInterpreter(String command){
          
         //11: Detected colour ID XX
         case "11":
-        
-          //There are duplicates of the slow down and speed up signs. In order to determine which of the two signs the buggy encoutered the previous detection must be considered.
-          switch (Integer.valueOf((command.substring(3)).trim())){
-            //Red: Slow down sign
-            case 1:
-              if (currentDetection == 3)
-                currentDetection = 5;
-              else if (currentDetection == 6)
-                currentDetection = 7;
-            break;
+
+          int colourId = Integer.valueOf((command.substring(3)).trim());
+          if (colourId == 1 || colourId == 4){
             
-            //Green: Speed up sign
-            case 2:
+            if (currentDetection == 3)
+              currentDetection = 5;
+            else if (currentDetection == 6)
+              currentDetection = 7;
+              
+          } else if (colourId == 2 || colourId == 5){
               if (currentDetection == 5)
                 currentDetection = 6;
               else if (currentDetection == 2)
                 currentDetection = 6;
               else if (currentDetection == 7)
                 currentDetection = 8;
-            break;
-            
-            //Yellow: Take fork
-            case 3:
+                
+          } else if (colourId == 3)
               currentDetection = 4;
-              
-            break;     
-          }
-          
         break;
         
         //20: Unknown command
@@ -169,6 +166,8 @@ void commandInterpreter(String command){
         break;
            
   }
+
+    
   break;
   }
 }
@@ -178,14 +177,17 @@ public void controlEvent(ControlEvent theEvent){
   if (millis() > 2000){
     switch (theEvent.getController().getName()){
       case "controlToggle":
- 
+         pressedToggle = true;
+                     
+        if (controlToggle){ 
+         port.write("1 \n");
+
+        }
+          
+        else{
+         port.write("0 \n");
+        }
         
-        if (controlToggle)
-          port.write("1" + "\n");
-          
-        else
-          port.write("0" + "\n");
-          
          controlToggle = !controlToggle;
       
         break;
@@ -272,4 +274,49 @@ void highLightLocation(){
      
       
     }
+}
+
+
+void printCommandInformation(String command){
+  switch (command.substring(1, 3).trim()){
+    case "6":
+      println("Obstacle detected at " + command.substring(3).trim() + " cm");
+      
+    break;
+    
+    case "7":
+      println("Detected gantry #: " + (command.substring(3)).trim());
+    break;
+    
+    case "8":
+      println("Motor power: " + (command.substring(3)).trim());
+    break;
+    
+    case "9":
+      println("Start command received");
+    break;
+    
+    case "10":
+      println("Stop command received");
+    break;
+    
+    case "11":
+    
+      print("Detected colour: ");
+      int colourId = Integer.valueOf((command.substring(3)).trim());
+        if (colourId == 1 || colourId == 4)
+          println("Blue");
+        else if (colourId == 2 || colourId == 5)
+          println("Green");
+        else if (colourId == 3)
+          println("Yellow");
+
+      break;
+      
+    case "12":
+      println("Did not recognise gantry number");
+      break;
+
+  }
+  
 }

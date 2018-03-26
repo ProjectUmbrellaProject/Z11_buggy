@@ -8,37 +8,36 @@
 #define leftOverride 5
 #define rightOverride 6
 #define rightMotorPin 7
-#define trigPin 8
-#define echoPin 9
+#define echoPin 8
+#define trigPin 9
+
 
 String inputString = "";
+short motorPower = 170;
+const short reducedSpeed = 135;
+const short maxSpeed = 170;
+bool forward, stringComplete;
 
+bool turndirection = true; // false  = left, true  = right
+
+//Object detection variables
 unsigned long previousPingTime;
 const short pingInterval = 400; //Determines how frequently the distance is measured from the ultrasonic sensor
 const short minimumDistance = 15; //Determines how close an object must be to stop the buggy
-int motorPower = 170;
-bool forward, objectDetected, stringComplete, onHalfSpeed;
+bool objectDetected;
 
-
+//Gantry detection variables
 bool gantry_detected; //true if gantry is detected
 unsigned long duration; //duration of the gantry pulse
 int pulsecounter; //how many pulses have been recorded
 int maxPulse; //maximum pulse length recorded
-const int gantryCounter = 2;
+const int gantryCounter = 3;
 
-
-// This is the main Pixy object
+//Pixy variables
 Pixy pixy;
-static int i = 0; //triggers the object detection pixy every 50 loops
-const int minimumDetections = 3;
-int previousDetected =-1;
+const int minimumDetections = 2;
+int previousDetected = -1;
 int detections[4]= {0,0,0,0};
-
-int reducedSpeed = 135;
-int maxSpeed = 170;
-
-bool detectedTurnSign;
-
 
 void setup() {
   //Declare output and input pins
@@ -47,18 +46,17 @@ void setup() {
   pinMode(speedPin, OUTPUT);
   pinMode(leftMotorPin, OUTPUT);
   pinMode(rightMotorPin, OUTPUT);
-  pinMode(gantryIRPIN, INPUT_PULLUP);
   pinMode(leftOverride, OUTPUT);
   pinMode(rightOverride, OUTPUT);
 
-  //setup for the gantry interrupt
+  //Setup for the gantry interrupt
   pinMode(gantryIRPIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(gantryIRPIN), gantryInterrupt, CHANGE);
-  //setup for the gantry pulse detection
+  
+  //Setup for the gantry pulse detection
   gantry_detected = false;
   pulsecounter =0;
   maxPulse = 0; 
-
 
   //Set the motor states to max power but off
   analogWrite(speedPin, 0);
@@ -70,7 +68,6 @@ void setup() {
   stringComplete = false;
   objectDetected = false;
   forward = false;
-  onHalfSpeed = false;
     
   Serial.begin(9600); // initiate serial commubnication at 9600 baud rate
   Serial.print("+++"); //Enter xbee AT commenad mode, NB no carriage return here
@@ -82,13 +79,13 @@ void setup() {
 
   //Send status to monitoring program
   Serial.println("Buggy: Setup Complete.");
-  detectedTurnSign = false;
 
   pixy.init();
 }
 
 void loop() {
-  
+
+  //Clear the pixy counters and check the ultrasonic sensor every pingInterval ms
   unsigned long currentTime = millis(); //Update the time variable with the current time
   if (currentTime - previousPingTime >= pingInterval){
     previousPingTime = currentTime; 
@@ -99,6 +96,7 @@ void loop() {
       //This way an object must be detected minimumDetections number of times within 200ms before the buggy responds
   }
   
+  //If a new string has been received call the movecommand function
   if (stringComplete) {
     //The stringComplete bool indicates whether or not a new command has been recieved
      moveCommand(inputString.toInt());
@@ -107,15 +105,15 @@ void loop() {
     inputString = "";
     stringComplete = false;
   }
- 
+  //Handle gantry detection 
   readPulse();
-
+  //Check for signs
   detectSigns();
 }
 
 void moveCommand(int command){
+  
     switch (command){
-
       //Stop
       case 0:
         delay(20);
@@ -140,51 +138,45 @@ void moveCommand(int command){
         
        //Go to half speed
        case 2:
-        if(!onHalfSpeed && forward){
+        if(forward){ //This prevents the buggy from starting when it detects a colour prior to receiving the start command
           motorPower = reducedSpeed;
           analogWrite(speedPin, motorPower);
           Serial.print("~8 ");
           Serial.println(motorPower);
-          onHalfSpeed = true;
-          detectedTurnSign = true;
         }
         break;
       
-      //Resume full speed
-      case 3:
-        if(onHalfSpeed && forward){
-          motorPower = maxSpeed;
-          analogWrite(speedPin, motorPower);
-          Serial.print("~8 ");
-          Serial.println(motorPower);
-          onHalfSpeed = false;
-          detectedTurnSign = false;
-        }
-        break;
+        //Resume full speed
+        case 3:
+          if(forward){
+            motorPower = maxSpeed;
+            analogWrite(speedPin, motorPower);
+            Serial.print("~8 ");
+            Serial.println(motorPower);
+          }
+          break;
 
-      //Turn left
-      case 4:
-      if (!detectedTurnSign){
-        delay(200);
-        digitalWrite(rightOverride, HIGH);
-        delay(400);
-        digitalWrite(rightOverride, LOW);
-        detectedTurnSign = true;
-      }
-        break;
+        //Turn right
+        case 4:
+        if(turndirection){
+          //turn right
+          digitalWrite(leftOverride, HIGH);
+          delay(1500);
+          digitalWrite(leftOverride, LOW);
+          } 
+          else {
+          //turn left
+          delay(200);
+          digitalWrite(rightOverride, HIGH);
+          delay(700);
+          digitalWrite(rightOverride, LOW);
+          }
+          break;
 
-        
-      //Turn right
-      case 5:
-        delay(200);
-        digitalWrite(leftOverride, HIGH);
-        delay(200);
-        digitalWrite(leftOverride, LOW);
-        break;
-        
-      default:
-        Serial.println("~20");
-        break;
+          
+        default:
+          Serial.println("~20");
+          break;
   }
   
 }
@@ -209,6 +201,7 @@ void handleObjectDetection(){
         moveCommand(1);
     }
 }
+
 //This function returns the distance to the nearest object as measured by the ultrasonic sensor
 long obstacleDistance(){
   long distance, duration;
@@ -232,72 +225,65 @@ long obstacleDistance(){
 
   
 }
+
 void gantryInterrupt(){
   //Interrupts have to be as short as possible to avoid slowing done the program. The flag updated in this function will allow the loop to handle the gantrydetection
   gantry_detected = true;
 }
 
 void serialEvent() {
-  while (Serial.available()) {
-    // get the new byte:
-    char inChar = (char)Serial.read();
-    
-    // add it to the inputString:
-    inputString += inChar;
-    
-    // if the incoming character is a newline, set a flag so the main loop can
-    // do something about it:
-    if (inChar == '\n') {
-      stringComplete = true;
-    }
+  if (Serial.available()){
+    inputString = Serial.readStringUntil('\n');
+    stringComplete = true;
   }
 }
 
 void detectSigns(){ 
   uint16_t blocks = pixy.getBlocks();
-  
+    
   if (blocks > 0) {
     
-    i++; //The counter ensures that this code is only run after every 10 functions calls. Otherwise the arduino would be overloaded
-    
-    if (i % 1 == 0) { //Check every 10 frames/200ms
-      i = 0; //Reset i to prevent overflow
-    
-       for (int i = 0; i < blocks; i++){
-        
-        if (pixy.blocks[i].y > 180) //Only detections above y = 170 are considered so the buggy doesnt react to signs prematurely 
+    for (int i = 0; i < blocks; i++){
+      if (pixy.blocks[i].y > 150) //Only detections above y = 180 are considered so the buggy doesnt react to signs prematurely 
+               
+        detections[pixy.blocks[i].signature - 1]++;
 
-                 
-          detections[pixy.blocks[i].signature - 1]++;
-
-          if (detections[pixy.blocks[i].signature -1] >= minimumDetections){
-              if(previousDetected == -1){
-                previousDetected = pixy.blocks[i].signature;
-              }
-              else if(previousDetected != pixy.blocks[i].signature){
+        if (detections[pixy.blocks[i].signature -1] >= minimumDetections){
               
-                Serial.print("~11");
-                Serial.println(pixy.blocks[i].signature);   
-                moveCommand(pixy.blocks[i].signature +1);
-                previousDetected = pixy.blocks[i].signature;
-              }
+            if(previousDetected != pixy.blocks[i].signature && previousDetected != pixy.blocks[i].signature + 3 && previousDetected != pixy.blocks[i].signature - 3 ){
+              Serial.print("~11");
+              Serial.println(pixy.blocks[i].signature);
+              //moveCommand(pixy.blocks[i].signature +1);
 
-              break; //Only one detection will be considered in every 10 frames
+              if(pixy.blocks[i].signature == 1)
+                moveCommand(2);
+              else if (pixy.blocks[i].signature == 2)
+                moveCommand(3);
+              else if (pixy.blocks[i].signature == 3)
+                moveCommand(4);
+              else if (pixy.blocks[i].signature == 4)
+                moveCommand(2);
+              else if (pixy.blocks[i].signature == 5)
+                moveCommand(3);
+                
+              previousDetected = pixy.blocks[i].signature;
+            }
+            else if(previousDetected == -1)
+              previousDetected = pixy.blocks[i].signature;  
+               
+            break; //Only one detection will be considered
 
-          }
-              /*This assumes the colours are stored as follows:
-               * 1. Half speed - red
-               * 2. Full speed - green
-               * 3. Turn right - yellow
-               * 4. Turn left
-               */
-        
-       }        
-
-       
-      }
+        }
+            /*This assumes the colours are stored as follows:
+             * 1. Half speed - red
+             * 2. Full speed - green
+             * 3. Turn right - yellow
+             * 4. Turn left
+             */
+      
+      }        
     }
-  }
+ }
 
 void readPulse(){
   
@@ -312,7 +298,7 @@ void readPulse(){
     gantry_detected = false;
     //adjust this delay to get faster timing
     //(make sure that the buggy waits long enough at the gantry to do this)
-    delay(100);
+    delay(50);
     pulsecounter++;
     
   }
@@ -321,7 +307,7 @@ void readPulse(){
     int gantryNum = determineGantry();
     
     if(gantryNum == -1)
-      Serial.println("undetermined gantry");
+      Serial.println("~12");
     else{
       Serial.print("~7 ");
       Serial.println(gantryNum);
